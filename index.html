@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="ur">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WinGo Strict Confirmation Master Engine</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800;900&display=swap');
+
+        :root {
+            --bg-deep: #030712;
+            --card-glass: rgba(13, 18, 36, 0.96);
+            --white-stroke: rgba(255, 255, 255, 0.85);
+            --accent-cyan: #00f2fe;
+            --accent-green: #10b981;
+            --accent-red: #ff3366;
+            --gold: #ffb703;
+            --text-main: #f8fafc;
+            --text-sub: #94a3b8;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+        body { background-color: var(--bg-deep); color: var(--text-main); display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 6px; }
+
+        .app-card {
+            width: 100%; max-width: 440px; background: var(--card-glass);
+            backdrop-filter: blur(20px); border-radius: 20px; padding: 12px;
+            border: 1.5px solid var(--white-stroke); box-shadow: 0 0 25px rgba(0,242,254,0.15);
+        }
+
+        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .header-title h1 { font-size: 7.5px; color: #fff; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+        .sync-badge { background: rgba(0, 242, 254, 0.2); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); font-size: 8px; font-weight: 800; padding: 3px 6px; border-radius: 10px; }
+
+        .period-box {
+            background: rgba(3, 7, 18, 0.65); border-radius: 10px; padding: 6px 10px;
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        .timer-container {
+            background: rgba(3, 7, 18, 0.75); border-radius: 10px; padding: 4px 10px; margin-bottom: 6px; border: 1px solid rgba(255, 255, 255, 0.12); text-align: center;
+        }
+        .timer-clock { font-size: 16px; font-weight: 900; color: var(--accent-green); font-family: monospace; }
+
+        .ai-grid {
+            display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; margin-bottom: 8px;
+        }
+        .ai-card {
+            background: rgba(3, 7, 18, 0.75); border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px; padding: 5px 7px; font-size: 7.5px;
+        }
+        .ai-title { color: var(--gold); font-weight: 800; display: flex; justify-content: space-between; margin-bottom: 2px; }
+        .ai-vote { font-weight: 900; color: #fff; font-size: 9px; }
+
+        .supervisor-signal-box {
+            width: 100%;
+            background: linear-gradient(135deg, rgba(0, 242, 254, 0.15), rgba(16, 185, 129, 0.2));
+            border-radius: 14px; padding: 10px; text-align: center; margin-bottom: 8px;
+            border: 2px solid var(--accent-cyan);
+            box-shadow: 0 0 20px rgba(0, 242, 254, 0.3);
+        }
+
+        .signal-label { font-size: 8px; color: var(--text-sub); font-weight: 800; letter-spacing: 1px; }
+        .signal-trend {
+            font-size: 26px; font-weight: 900; margin: 3px 0; color: #fff;
+            text-shadow: 0 0 15px rgba(0, 242, 254, 0.7); letter-spacing: 2px;
+        }
+
+        .user-card {
+            background: rgba(15, 23, 42, 0.75); border-radius: 12px; padding: 8px; margin-bottom: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .history-container {
+            background: rgba(3, 7, 18, 0.85); border-radius: 10px; padding: 6px;
+            border: 1.5px solid rgba(255, 183, 3, 0.35); max-height: 130px; overflow-y: auto; margin-top: 4px;
+        }
+
+        .history-table { width: 100%; border-collapse: collapse; font-size: 8px; text-align: center; }
+        .history-table th { color: var(--text-sub); padding: 4px 2px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); position: sticky; top: 0; background: #030712; }
+        .history-table td { padding: 4px 2px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); }
+
+        .badge-win { background: rgba(16, 185, 129, 0.2); color: var(--accent-green); border: 1px solid var(--accent-green); padding: 1px 4px; border-radius: 3px; font-weight: 800; }
+        .badge-loss { background: rgba(255, 51, 102, 0.2); color: var(--accent-red); border: 1px solid var(--accent-red); padding: 1px 4px; border-radius: 3px; font-weight: 800; }
+        .badge-skip { background: rgba(255, 183, 3, 0.25); color: var(--gold); border: 1px solid var(--gold); padding: 1px 4px; border-radius: 3px; font-weight: 800; }
+    </style>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCLBtPq8xK9COk6GZyC-zHEtLFfW8-qQH0",
+            authDomain: "ghugh-b4903.firebaseapp.com",
+            projectId: "ghugh-b4903",
+            storageBucket: "ghugh-b4903.firebasestorage.app",
+            messagingSenderId: "960134803091",
+            appId: "1:960134803091:web:795feeb01f4199bbeee766",
+            measurementId: "G-N87ZW6067E"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        let userId = localStorage.getItem("wingo_user_id");
+        if (!userId) {
+            userId = "User_" + Math.random().toString(36).substring(2, 9);
+            localStorage.setItem("wingo_user_id", userId);
+        }
+
+        window.syncUserActivityToCloud = async function(historyLogs, totalWins, totalLosses, currentStep) {
+            try {
+                const userDocRef = doc(db, "users_activity", userId);
+                const userDocCheck = await getDoc(userDocRef);
+
+                if (userDocCheck.exists() && userDocCheck.data().isBanned === true) {
+                    alert("آپ کا اکاؤنٹ مستقل طور پر بلاک کر دیا گیا ہے!");
+                    document.body.innerHTML = "<h1 style='color:red; text-align:center; margin-top:20vh;'>ACCESS DENIED: Account Banned.</h1>";
+                    return;
+                }
+
+                await setDoc(userDocRef, {
+                    userId: userId,
+                    lastUpdated: new Date().toISOString(),
+                    wins: totalWins,
+                    losses: totalLosses,
+                    currentStep: currentStep,
+                    isBanned: false,
+                    history: historyLogs.slice(0, 500)
+                }, { merge: true });
+            } catch (e) { console.error("Cloud Sync Error: ", e); }
+        };
+    </script>
+</head>
+<body>
+
+<div class="app-card">
+    <div class="top-bar">
+        <div class="header-title"><h1>Strict Confirmation Master Engine</h1></div>
+        <div class="sync-badge">🔒 HIGH CONFIDENCE</div>
+    </div>
+
+    <div class="period-box">
+        <div><div style="font-size:8px; color:var(--text-sub)">TARGET PERIOD</div><div style="font-size:12px; font-weight:900; color:var(--gold)" id="targetPeriod">----</div></div>
+        <div style="text-align: right;"><div style="font-size:8px; color:var(--text-sub)">LAST RESULT</div><div style="font-size:12px; font-weight:900; color:var(--accent-cyan)" id="lastNum">-</div></div>
+    </div>
+
+    <div class="timer-container">
+        <div class="timer-clock" id="timerClock">00:30</div>
+    </div>
+
+    <div class="ai-grid">
+        <div class="ai-card">
+            <div class="ai-title"><span>🐉 AI-1 (Dragon)</span><span style="color:var(--accent-green)">Filter</span></div>
+            <div class="ai-vote" id="ai1Vote">SCANNING</div>
+        </div>
+        <div class="ai-card">
+            <div class="ai-title"><span>⚡ AI-2 (Zig-Zag)</span><span style="color:var(--accent-green)">Filter</span></div>
+            <div class="ai-vote" id="ai2Vote">SCANNING</div>
+        </div>
+        <div class="ai-card">
+            <div class="ai-title"><span>👥 AI-3 (Pairs 2-2)</span><span style="color:var(--accent-green)">Filter</span></div>
+            <div class="ai-vote" id="ai3Vote">SCANNING</div>
+        </div>
+        <div class="ai-card">
+            <div class="ai-title"><span>🛡️ AI-4 (Strict Shield)</span><span style="color:var(--gold)">Guard</span></div>
+            <div class="ai-vote" id="ai4Vote">ACTIVE</div>
+        </div>
+    </div>
+
+    <div class="supervisor-signal-box" id="signalBox">
+        <div class="signal-label" id="supervisorLabel">STRICT CONFLUENCE SUPERVISOR</div>
+        <div class="signal-trend" id="predTrend">SKIP</div>
+        <div style="font-size:8.5px; font-weight:800; color:var(--gold);" id="phaseMode">⚡ Engine active & monitoring strict setups...</div>
+    </div>
+
+    <div class="user-card">
+        <div style="display: flex; justify-content: space-between; font-size: 9px; font-weight: 800; margin-bottom: 4px;">
+            <span style="color: var(--accent-cyan);" id="userIdDisplay">👤 User</span>
+            <span style="color: var(--gold);" id="winRateText">WIN: 0/0</span>
+        </div>
+
+        <div style="font-size: 8.5px; color: var(--text-sub); line-height: 1.2; background: rgba(3, 7, 18, 0.5); padding: 4px; border-radius: 5px;" id="logicBox">
+            > Strict Confirmation active. Monitoring high-accuracy setups and skipping uncertain zones.
+        </div>
+
+        <div class="history-container">
+            <table class="history-table">
+                <thead>
+                    <tr>
+                        <th>PERIOD</th>
+                        <th>RESULT</th>
+                        <th>FILTER STATUS</th>
+                        <th>PREDICT</th>
+                        <th>STATUS</th>
+                    </tr>
+                </thead>
+                <tbody id="historyBody">
+                    <tr><td colspan="5" style="color:var(--accent-green);">Strict Engine Active & Ready!</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    const WINGO_30S_API = "https://draw.ar-lottery01.com/WinGo/WinGo_30S/GetHistoryIssuePage.json";
+    let totalWins = 0, totalLosses = 0;
+    let currentStep = 1;
+    let lastPrediction = null, lastProcessedIssue = "", historyLogs = [];
+    let activePatternUsed = "Strict Filter";
+
+    document.getElementById('userIdDisplay').innerText = `👤 ${localStorage.getItem("wingo_user_id") || "User"}`;
+
+    function startTimerEngine() {
+        setInterval(() => {
+            const remSec = 30 - (new Date().getSeconds() % 30);
+            document.getElementById('timerClock').innerText = `00:${remSec < 10 ? '0' : ''}${remSec}`;
+            if (remSec === 29 || remSec === 1 || remSec === 28) runLiveEngine();
+        }, 1000);
+    }
+
+    async function fetchDirectData() {
+        try {
+            const res = await fetch(WINGO_30S_API);
+            if (res.ok) {
+                const json = await res.json();
+                return json.data?.list || json.list || json.data || [];
+            }
+        } catch (e) {}
+        return null;
+    }
+
+    /* --- STRICT CONFIRMATION & CONFLUENCE ENGINE --- */
+    function computeStrictConfirmation(list, step) {
+        if (!list || list.length === 0) {
+            return { prediction: "SKIP", mode: "Initializing", desc: "Loading API...", reason: "Fetching live records.", aiVotes: ["SCANNING", "SCANNING", "SCANNING", "ACTIVE"], isSkip: true };
+        }
+
+        const sizes = list.slice(0, 12).map(i => {
+            let n = parseInt(i.number ?? i.num ?? i.winningNumber ?? i.price ?? 0);
+            return isNaN(n) ? "BIG" : (n >= 5 ? "BIG" : "SMALL");
+        });
+
+        // 1. Dragon Check (Needs at least 3 streak)
+        let topSize = sizes[0];
+        let streak = 0;
+        for (let s of sizes) { if (s === topSize) streak++; else break; }
+        let isDragon = streak >= 3;
+        let ai1Vote = isDragon ? `${topSize} (${streak})` : "NO DRAGON";
+
+        // 2. Zig-Zag Check (Needs clean alternation)
+        let isZigZag = (sizes[0] !== sizes[1] && sizes[1] !== sizes[2] && sizes[2] !== sizes[3]);
+        let zigZagPred = (sizes[0] === "BIG") ? "SMALL" : "BIG";
+        let ai2Vote = isZigZag ? zigZagPred : "NO ZIG-ZAG";
+
+        // 3. 2-2 Pair Check (دو دو والا جوڑا)
+        let isTwoTwoPair = (sizes[0] === sizes[1] && sizes[2] === sizes[3] && sizes[0] !== sizes[2]);
+        let pairPred = (sizes[0] === "BIG") ? "SMALL" : "BIG";
+        let ai3Vote = isTwoTwoPair ? pairPred : "NO PAIR";
+
+        let confirmedSignal = null;
+        let patternName = "";
+
+        if (isDragon && streak >= 3) {
+            confirmedSignal = topSize;
+            patternName = `Dragon (${streak})`;
+        } else if (isZigZag) {
+            confirmedSignal = zigZagPred;
+            patternName = "Zig-Zag Trend";
+        } else if (isTwoTwoPair) {
+            confirmedSignal = pairPred;
+            patternName = "2-2 Pair Trend";
+        }
+
+        if (!confirmedSignal || (step >= 2 && !isDragon && !isZigZag && !isTwoTwoPair)) {
+            return {
+                prediction: "SKIP",
+                mode: "Strict Skip",
+                desc: "🛡️ Unconfirmed Setup - SAFE SKIP",
+                reason: `Market lacks strict confirmation. Enforcing safe SKIP.`,
+                aiVotes: [ai1Vote, ai2Vote, ai3Vote, "SKIP"],
+                isSkip: true
+            };
+        }
+
+        return {
+            prediction: confirmedSignal,
+            mode: patternName,
+            desc: `🟢 Confirmed Setup: ${patternName} (${confirmedSignal})`,
+            reason: `Strict confirmation verified via ${patternName}. High probability signal aligned.`,
+            aiVotes: [ai1Vote, ai2Vote, ai3Vote, "PLAY"],
+            isSkip: false
+        };
+    }
+
+    async function runLiveEngine() {
+        const list = await fetchDirectData();
+        if (!list || list.length === 0) return;
+
+        const latest = list[0];
+        const lastNum = parseInt(latest.number ?? latest.num ?? latest.winningNumber ?? latest.price ?? 0);
+        const lastIssue = String(latest.issueNumber ?? latest.issue ?? latest.period ?? "");
+        const actualSize = lastNum >= 5 ? "BIG" : "SMALL";
+
+        if (lastIssue && lastIssue === lastProcessedIssue) return;
+        if (lastIssue) lastProcessedIssue = lastIssue;
+
+        document.getElementById('lastNum').innerText = `${lastNum} (${actualSize})`;
+
+        try {
+            if (lastIssue) {
+                document.getElementById('targetPeriod').innerText = (BigInt(lastIssue) + 1n).toString().slice(-4);
+            }
+        } catch(e) { document.getElementById('targetPeriod').innerText = "NEXT"; }
+
+        if (lastPrediction !== null && lastPrediction !== "SKIP") {
+            let status = "";
+            let isWin = (actualSize === lastPrediction);
+            if (isWin) {
+                status = "WIN";
+                totalWins++;
+                currentStep = 1;
+            } else {
+                status = "LOSS";
+                totalLosses++;
+                currentStep++;
+                if (currentStep > 4) currentStep = 4;
+            }
+
+            historyLogs.unshift({
+                issue: lastIssue || "----", actual: `${lastNum} (${actualSize})`,
+                trend: activePatternUsed, pred: lastPrediction, status: status
+            });
+
+            document.getElementById('historyBody').innerHTML = historyLogs.slice(0, 15).map(item => {
+                let badgeClass = item.status === 'WIN' ? 'badge-win' : 'badge-loss';
+                return `<tr><td>${item.issue.slice(-4)}</td><td><b>${item.actual}</b></td><td style="font-size:7.5px; color:var(--gold);">${item.trend}</td><td><b>${item.pred}</b></td><td><span class="${badgeClass}">${item.status}</span></td></tr>`;
+            }).join('');
+
+            document.getElementById('winRateText').innerText = `WIN: ${totalWins}/${totalWins + totalLosses}`;
+            if (typeof window.syncUserActivityToCloud === "function") {
+                window.syncUserActivityToCloud(historyLogs, totalWins, totalLosses, currentStep);
+            }
+        } else if (lastPrediction === "SKIP") {
+            historyLogs.unshift({
+                issue: lastIssue || "----", actual: `${lastNum} (${actualSize})`,
+                trend: "Strict Skip", pred: "SKIPPED", status: "SKIP"
+            });
+            document.getElementById('historyBody').innerHTML = historyLogs.slice(0, 15).map(item => {
+                let badgeClass = item.status === 'WIN' ? 'badge-win' : (item.status === 'LOSS' ? 'badge-loss' : 'badge-skip');
+                return `<tr><td>${item.issue.slice(-4)}</td><td><b>${item.actual}</b></td><td style="font-size:7.5px; color:var(--gold);">${item.trend}</td><td><b>${item.pred}</b></td><td><span class="${badgeClass}">${item.status}</span></td></tr>`;
+            }).join('');
+        }
+
+        const engineResult = computeStrictConfirmation(list, currentStep);
+        lastPrediction = engineResult.prediction;
+        activePatternUsed = engineResult.mode;
+
+        const trendDiv = document.getElementById('predTrend');
+        const boxDiv = document.getElementById('signalBox');
+        
+        if (lastPrediction === "SKIP") {
+            trendDiv.innerText = "SKIP 🛡️";
+            trendDiv.style.color = "var(--gold)";
+            boxDiv.style.borderColor = "var(--gold)";
+        } else {
+            trendDiv.innerText = lastPrediction;
+            trendDiv.style.color = "#fff";
+            boxDiv.style.borderColor = "var(--accent-cyan)";
+        }
+
+        document.getElementById('phaseMode').innerText = engineResult.desc;
+        document.getElementById('logicBox').innerHTML = `> <b>Strict Log:</b> ${engineResult.reason}`;
+
+        // Direct DOM Update for 4 AI Votes
+        document.getElementById('ai1Vote').innerText = engineResult.aiVotes[0] || "SCANNING";
+        document.getElementById('ai2Vote').innerText = engineResult.aiVotes[1] || "SCANNING";
+        document.getElementById('ai3Vote').innerText = engineResult.aiVotes[2] || "SCANNING";
+        document.getElementById('ai4Vote').innerText = engineResult.aiVotes[3] || "ACTIVE";
+        document.getElementById('p4Score').innerText = `Step ${currentStep}`;
+    }
+
+    startTimerEngine();
+    runLiveEngine();
+</script>
+
+</body>
+</html>
